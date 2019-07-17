@@ -1,0 +1,32 @@
+#!/usr/bin/env nix-shell
+#!nix-shell -p nix-diff -p nix -i bash
+#
+# nix-build that shows why it rebuilds using nix-diff
+#
+# This is just an experiment and doesn't cover all the corner-cases.
+set -euo pipefail
+
+drv_link=$PWD/result.drv
+out_link=$PWD/result
+
+# resolve the previous drv if it exists
+previous_drv=
+if [[ -e "$drv_link" ]]; then
+  previous_drv=$(readlink -f "$drv_link")
+fi
+
+# create the .drv manually
+nix-instantiate \
+   --add-root "$drv_link" --indirect \
+  "$@"
+
+# if the is a previous drv, show the diff
+if [[ -n "$previous_drv" ]]; then
+  nix-diff "$previous_drv" "$(readlink -f $drv_link)"
+fi
+
+# and finally build the .drv file
+nix-store \
+  --realize \
+  --add-root "$out_link" --indirect \
+  "$previous_drv"
