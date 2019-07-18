@@ -4,29 +4,25 @@
 # nix-build that shows why it rebuilds using nix-diff
 #
 # This is just an experiment and doesn't cover all the corner-cases.
+#
+# In particular it assumes that the --out-path is the default ./result
 set -euo pipefail
 
-drv_link=$PWD/result.drv
 out_link=$PWD/result
 
 # resolve the previous drv if it exists
 previous_drv=
-if [[ -e "$drv_link" ]]; then
-  previous_drv=$(readlink -f "$drv_link")
+if [[ -e "$out_link" ]]; then
+  previous_drv=$(nix-store --query --deriver "$out_link")
+  if [[ previous_drv = "unknown-deriver" ]]; then
+    previous_drv=
+  fi
 fi
 
-# create the .drv manually
-nix-instantiate \
-   --add-root "$drv_link" --indirect \
-  "$@"
+# invoke nix-build normally
+nix-build "$@"
 
-# if the is a previous drv, show the diff
+# if the build is successful and there is a previous drv, show the diff
 if [[ -n "$previous_drv" ]]; then
-  nix-diff "$previous_drv" "$(readlink -f $drv_link)"
+  nix-diff "$previous_drv" "$(nix-store --query --deriver "$out_link")"
 fi
-
-# and finally build the .drv file
-nix-store \
-  --realize \
-  --add-root "$out_link" --indirect \
-  "$previous_drv"
